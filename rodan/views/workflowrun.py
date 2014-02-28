@@ -65,7 +65,7 @@ class WorkflowRunList(generics.ListCreateAPIView):
         except:
             return Response({"message": "You must specify an existing workflow"}, status=status.HTTP_404_NOT_FOUND)
 
-        workflow_jobs = WorkflowJob.objects.filter(workflow=workflow_obj).order_by('sequence')
+        workflow_jobs = WorkflowJob.objects.filter(workflow=workflow_obj).order_by('previous')
 
         if not workflow_jobs.exists():
             return Response({"message": "No jobs for workflow {0} were specified".format(workflow)}, status=status.HTTP_400_BAD_REQUEST)
@@ -112,7 +112,7 @@ class WorkflowRunList(generics.ListCreateAPIView):
                                 job_settings=workflow_job.job_settings,  # copy the most recent settings from the workflow job (these may be modified if the job is interactive)
                                 needs_input=is_interactive,      # by default this is set to be True if the job is interactive
                                 page=page,
-                                sequence=workflow_job.sequence)
+                                previous=workflow_job.previous)
                 runjob.save()
 
                 rodan_task = registry.tasks[str(workflow_job.job_name)]

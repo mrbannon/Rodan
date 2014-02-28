@@ -12,7 +12,7 @@ from celery import Task
 def _add_result_to_bag(page_dir, runjob, bag):
     # TO-DO: Make error inclusion optional. Make unrun runjob inclustion optional.
     short_job_name = runjob.job_name.split('.')[-1]  # get the last part of job name
-    runjob_dir = os.path.join(page_dir, "%s_%s" % (runjob.sequence, short_job_name))
+    runjob_dir = os.path.join(page_dir, "%s_%s" % (runjob.previous, short_job_name))
 
     if runjob.status == RunJobStatus.HAS_FINISHED:
         os.makedirs(runjob_dir)

@@ -1,6 +1,7 @@
 import os
 import shutil
 from django.db import models
+from rodan.models.workflowjob import WorkflowJob
 from django_extensions.db.fields import json
 from uuidfield import UUIDField
 
@@ -38,11 +39,11 @@ class RunJob(models.Model):
 
     @property
     def runjob_path(self):
-        return os.path.join(self.workflow_run.workflow_run_path, "{0}_{1}".format(self.workflow_job.sequence, str(self.pk)))
+        return os.path.join(self.workflow_run.workflow_run_path, "{0}_{1}".format(self.workflow_job.previous, str(self.pk)))
 
     class Meta:
         app_label = 'rodan'
-        ordering = ['workflow_job__sequence']
+        ordering = ['workflow_job__previous']
 
     uuid = UUIDField(primary_key=True, auto=True)
     workflow_run = models.ForeignKey("rodan.WorkflowRun", related_name="run_jobs")
@@ -52,7 +53,7 @@ class RunJob(models.Model):
     job_settings = json.JSONField(blank=True, null=True)
     needs_input = models.BooleanField(default=False)
     status = models.IntegerField(choices=STATUS_CHOICES, default=0)
-    sequence = models.IntegerField(blank=True, null=True)
+    previous = models.ForeignKey(WorkflowJob, related_name="job_chain", blank=True, null=True)
     celery_task_id = models.CharField(max_length=255, blank=True, null=True)
 
     error_summary = models.TextField(default="", blank=True, null=True)

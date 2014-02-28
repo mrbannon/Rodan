@@ -44,7 +44,7 @@ class RunJobSerializer(serializers.HyperlinkedModelSerializer):
                   'workflow_name',
                   'workflow_run',
                   'workflow_job',
-                  'sequence',
+                  'previous',
                   'result',
                   'page',
                   'job_settings',

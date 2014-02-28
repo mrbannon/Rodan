@@ -27,17 +27,18 @@ class RodanInteractiveBaseView(View):
         rj_uuid = request.GET['runjob']
         runjob = get_object_or_404(RunJob, pk=(rj_uuid))
 
-        sequence = runjob.workflow_job.sequence
+        previous = runjob.workflow_job.previous
         page = runjob.page
 
         # if this is the first job in the sequence, the file path is just the original image
-        if sequence == 1:
+        if previous == None:
             image_source = runjob.page
         else:
-            previous_run_job = RunJob.objects.get(workflow_job__sequence=(sequence - 1),
-                                                  workflow_run__uuid=runjob.workflow_run.uuid,
-                                                  page = page.uuid)
-            image_source = Result.objects.get(run_job__uuid=previous_run_job.uuid)
+            #previous_run_job = RunJob.objects.get(workflow_job__sequence=(sequence - 1),
+            #                                      workflow_run__uuid=runjob.workflow_run.uuid,
+            #                                      page = page.uuid)
+            #image_source = Result.objects.get(run_job__uuid=previous_run_job.uuid)
+            image_source = previous.page
 
         self.data.update({'form_url': self.view_url,
                       'run_job_uuid': rj_uuid,
