@@ -106,6 +106,7 @@ INSTALLED_APPS = (
     'guardian',
     # 'rodan.jobs',
     'corsheaders',
+    'ws4redis'
 )
 
 # A sample logging configuration. The only tangible logging
@@ -243,3 +244,9 @@ if TEST:
 if TEST:
     import tempfile as _tempfile
     MEDIA_ROOT = _tempfile.mkdtemp() + '/'
+
+
+###############################################################################
+## WebSockets and Redis configuration
+###############################################################################
+WEBSOCKET_URL = '/ws/'
