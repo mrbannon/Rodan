@@ -99,6 +99,7 @@ INSTALLED_APPS = (
     'django.contrib.sites',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'ws4redis',
     'rodan',
     'django_extensions',
     'rest_framework',
@@ -106,7 +107,6 @@ INSTALLED_APPS = (
     'guardian',
     # 'rodan.jobs',
     'corsheaders',
-    'ws4redis'
 )
 
 # A sample logging configuration. The only tangible logging
@@ -170,8 +170,7 @@ TEMPLATE_CONTEXT_PROCESSORS = (
     "django.core.context_processors.static",
     "django.core.context_processors.csrf",
     "django.contrib.messages.context_processors.messages",
-    # "rodan.context_processors.list_projects",
-    # "rodan.context_processors.login_url",
+    'ws4redis.context_processors.default',
 )
 
 FILE_UPLOAD_HANDLERS = (
@@ -250,3 +249,8 @@ if TEST:
 ## WebSockets and Redis configuration
 ###############################################################################
 WEBSOCKET_URL = '/ws/'
+WSGI_APPLICATION = 'ws4redis.django_runserver.application'
+WS4REDIS_EXPIRE = 3600
+WS4REDIS_HEARTBEAT = '--heartbeat--'
+WS4REDIS_PREFIX = 'rodan'
+
