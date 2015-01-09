@@ -32,11 +32,16 @@ def load_gamera_module(gamera_module):
             'maximum': 1,
         }]
 
+        try:
+            settings_schema = argconvert.convert_arg_list(fn.args.list)
+        except TypeError:  # we now exclude the function with argument <ImageType>
+            continue
+
         class gamera_module_task(RodanAutomaticTask):
             name = str(fn)
             author = fn.author
             description = fn.escape_docstring().replace("\\n", "\n").replace('\\"', '"')
-            settings = argconvert.convert_arg_list(fn.args.list)
+            settings = settings_schema
             enabled = True
             category = gamera_module.module.category
             input_port_types = input_types
@@ -64,7 +69,7 @@ def load_gamera_module(gamera_module):
                     from PIL import Image
                     Image.new("RGBA", size=(50, 50), color=(256, 0, 0)).save(inputs['input'][0]['resource_path'], 'png')
                     inputs['input'][0]['resource_type'] = 'image/rgb+png'
-                    outputs['output'][0]['resource_type'] = 'image/float+png'
+                    outputs['output'][0]['resource_type'] = 'image/greyscale+png'
                     self.run_my_task(inputs, {}, outputs)
                     im = Image.open(outputs['output'][0]['resource_path'])
                     testcase.assertEqual(im.mode, 'L')

@@ -91,8 +91,19 @@ class WorkflowViewTestCase(RodanTestTearDownMixin, APITestCase, RodanTestSetUpMi
         self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
         self.assertEqual(response.data, anticipated_message)
     def test_workflowjob__settings_not_satisfy(self):
-        # [TODO]
-        pass
+        self.test_job.settings = {
+            'type': 'object',
+            'required': ['a'],
+            'properties': {'a': {'type': 'number'}}
+        }
+        self.test_job.save()
+        self.test_workflowjob.job_settings = {'b': []}
+        self.test_workflowjob.save()
+        response = self._validate(self.test_workflow.uuid)
+        anticipated_message = {'detail': 'WorkflowJob {0} has invalid settings.'.format(self.test_workflowjob.uuid)}
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(response.data, anticipated_message)
+
 
     def test_input__type_incompatible_with_job(self):
         new_ipt = mommy.make('rodan.InputPortType')
@@ -425,7 +436,7 @@ class WorkflowSerializationTestCase(RodanTestTearDownMixin, APITestCase, RodanTe
     def setUp(self):
         self.setUp_rodan()
         self.setUp_user()
-        self.setUp_basic_workflow()
+        self.setUp_simple_dummy_workflow()
         self.client.login(username="ahankins", password="hahaha")
     def test_export(self):
         response = self.client.get("/workflow/{0}/?export=yes".format(self.test_workflow.uuid.hex))
@@ -444,3 +455,11 @@ class WorkflowSerializationTestCase(RodanTestTearDownMixin, APITestCase, RodanTe
         }, format='json')
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(self.test_project.workflows.count(), 2)
+
+        serialized['workflow_jobs'][0]['job_name'] = 'hahahaha'
+        response = self.client.post("/workflows/", {
+            'serialized': serialized,
+            'project': "http://localhost:8000/project/{0}/".format(self.test_project.uuid.hex)
+        }, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data, {'serialized': {'workflow_jobs[0].job_name': u'Job hahahaha does not exist in current Rodan installation.'}})

@@ -1,13 +1,16 @@
+import jsonschema
 from rest_framework import generics
 from rest_framework import permissions
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.exceptions import ValidationError
-from rodan.models import Workflow, ResourceAssignment, Connection, InputPort, OutputPort, Project, ResourceCollection
-from rodan.serializers.user import UserSerializer
+
+from rodan.paginators.pagination import PaginationSerializer
+from rodan.models import Workflow, ResourceAssignment, InputPort, OutputPort, ResourceCollection
 from rodan.serializers.workflow import WorkflowSerializer, WorkflowListSerializer, version_map
 from rodan.exceptions import CustomAPIException
 from django.conf import settings
+
 
 class WorkflowList(generics.ListCreateAPIView):
     """
@@ -23,6 +26,7 @@ class WorkflowList(generics.ListCreateAPIView):
     # permission_classes = (permissions.IsAuthenticated, )
     permission_classes = (permissions.AllowAny, )
     serializer_class = WorkflowListSerializer
+    pagination_serializer_class = PaginationSerializer
     filter_fields = ('project', )
     queryset = Workflow.objects.all() # [TODO] filter according to the user?
 
@@ -30,7 +34,8 @@ class WorkflowList(generics.ListCreateAPIView):
         valid = serializer.validated_data.get('valid', False)
         if valid:
             raise ValidationError({'valid': ["You can't create a valid workflow - it must be validated through a PATCH request."]})
-        wfrun = serializer.save(creator=self.request.user)
+
+        serializer.save(creator=self.request.user)
 
 
 class WorkflowDetail(generics.RetrieveUpdateDestroyAPIView):
@@ -59,12 +64,14 @@ class WorkflowDetail(generics.RetrieveUpdateDestroyAPIView):
         to_be_validated = serializer.validated_data.get('valid', False)
         if to_be_validated:
             workflow = self.get_object()
+
             try:
                 self._validate(workflow)
             except WorkflowValidationError as e:
                 raise CustomAPIException(e.message, status=status.HTTP_409_CONFLICT)
         else:
             raise ValidationError({"valid": "Cannot invalidate a Workflow."})
+
         serializer.save()
 
     def _validate(self, workflow):
@@ -89,7 +96,11 @@ class WorkflowDetail(generics.RetrieveUpdateDestroyAPIView):
                 if number_of_output_ports > opt.maximum or number_of_output_ports < opt.minimum:
                     raise WorkflowValidationError('The number of output ports on WorkflowJob {0} did not meet the requirements'.format(wfjob.uuid))
 
-            # [TODO] check settings argtype
+            v = jsonschema.Draft4Validator(dict(job.settings))  # convert JSONDict object to Python dict object.
+            try:
+                v.validate(wfjob.job_settings)
+            except jsonschema.exceptions.ValidationError as e:
+                raise WorkflowValidationError('WorkflowJob {0} has invalid settings.'.format(wfjob.uuid))
 
         # validate InputPorts
         input_ports = InputPort.objects.filter(workflow_job__workflow=workflow)
@@ -141,7 +152,7 @@ class WorkflowDetail(generics.RetrieveUpdateDestroyAPIView):
                 if not res.compat_resource_file:
                     raise WorkflowValidationError('The compatible resource file of resource {0} is not ready'.format(res.uuid))
                 type_of_res = res.resource_type
-                if not type_of_res in types_of_ip:
+                if type_of_res not in types_of_ip:
                     raise WorkflowValidationError('The type of resource {0} assigned does not agree with InputPort {1}'.format(res.uuid, ip.uuid))
 
         # graph validation
@@ -194,6 +205,7 @@ class WorkflowDetail(generics.RetrieveUpdateDestroyAPIView):
 
 class WorkflowValidationError(Exception):
     message = None
+
     def __init__(self, message):
         super(WorkflowValidationError, self).__init__()
         self.message = message
@@ -216,6 +228,6 @@ class DisjointSet(object):
             return new_parent
 
     def union(self, x, y):
-        xRoot = self.find(x)
-        yRoot = self.find(y)
-        self._parent[xRoot] = yRoot
+        x_root = self.find(x)
+        y_root = self.find(y)
+        self._parent[x_root] = y_root
