@@ -23,12 +23,14 @@ class RunJob(models.Model):
     - `workflow_run` -- a reference to `WorkflowRun`.
     - `workflow_job` -- a reference to `WorkflowJob`. If the `WorkflowJob` is deleted,
       this field will be set to None.
+    - `workflow_job_uuid` -- a copy of the uuid of `WorkflowJob`, to provide an identifier
+      of its origin after the `WorkflowJob` is deleted.
+    - `resource_uuid` -- a copy of the uuid of `Resource` in the `ResourceCollection`,
+      indicate the processing flow for every individual `Resource` in a batch. Allowed
+      to be null when it is singleton `RunJob`.
     - `job_name` -- the Rodan `Job` name of this `RunJob`.
-    - `interactive` -- denote whether the `RunJob` is an interactive job.
     - `job_settings` -- the settings associated with the `WorkflowJob` that is
       being executed in the `RunJob`.
-    - `ready_for_input` -- a boolean. If true, indicate that the `RunJob` is currently
-      ready for user input.
     - `status` -- an integer indicating the status of `RunJob`.
     - `celery_task_id` -- the corresponding Celery Task. This field is set after the
       `RunJob` starts running.
@@ -47,7 +49,8 @@ class RunJob(models.Model):
                       (task_status.PROCESSING, "Processing"),
                       (task_status.FINISHED, "Finished"),
                       (task_status.FAILED, "Failed"),
-                      (task_status.CANCELLED, "Cancelled")]
+                      (task_status.CANCELLED, "Cancelled"),
+                      (task_status.WAITING_FOR_INPUT, "Waiting for input")]
 
     class Meta:
         app_label = 'rodan'
@@ -55,11 +58,12 @@ class RunJob(models.Model):
     uuid = UUIDField(primary_key=True, auto=True)
     workflow_run = models.ForeignKey("rodan.WorkflowRun", related_name="run_jobs")
     workflow_job = models.ForeignKey("rodan.WorkflowJob", related_name="run_jobs", blank=True, null=True, on_delete=models.SET_NULL)
+
+    workflow_job_uuid = models.CharField(max_length=32)
+    resource_uuid = models.CharField(max_length=32, blank=True, null=True)
     job_name = models.CharField(max_length=200)
 
     job_settings = JSONField(default={})
-    interactive = models.BooleanField(default=False)
-    ready_for_input = models.BooleanField(default=False)
     status = models.IntegerField(choices=STATUS_CHOICES, default=0)
     celery_task_id = models.CharField(max_length=255, blank=True, null=True)
 
@@ -81,7 +85,7 @@ class RunJob(models.Model):
 
     @property
     def interactive_relurl(self):
-        if self.ready_for_input:
+        if self.status == task_status.WAITING_FOR_INPUT:
             return reverse('interactive', args=(self.uuid, ))
         else:
             return None

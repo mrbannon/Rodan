@@ -1,10 +1,10 @@
-from rodan.jobs.base import RodanAutomaticTask
+from rodan.jobs.base import RodanTask
 from gamera.core import load_image
 from gamera.toolkits.musicstaves import MusicStaves_rl_roach_tatem
 
 
-class RTStafflineRemovalTask(RodanAutomaticTask):
-    name = 'gamera.auto_tasks.staff_removal.RT_staff_removal'
+class RTStafflineRemovalTask(RodanTask):
+    name = 'gamera.custom.staff_removal.RT_staff_removal'
     author = "Deepanjan Roy"
     description = "Removes the staff lines usign Roach and Tatem Staffline removal algorithm."
     settings = {
@@ -55,8 +55,7 @@ class RTStafflineRemovalTask(RodanAutomaticTask):
         'maximum': 1
     }]
 
-    def run_my_task(self, inputs, rodan_job_settings, outputs):
-        settings = argconvert.convert_to_gamera_settings(rodan_job_settings)
+    def run_my_task(self, inputs, settings, outputs):
         task_image = load_image(inputs['input'][0]['resource_path'])
 
         clsss_init_settings = dict( [(k, settings[k]) for k in ('staffline_height', 'staffspace_height')] )

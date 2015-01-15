@@ -7,14 +7,14 @@ import gamera.classify
 import gamera.knn
 from gamera.core import load_image
 
-from rodan.jobs.gamera.auto_tasks.pitch_finding.AomrObject import AomrObject
-from rodan.jobs.gamera.auto_tasks.pitch_finding.AomrMeiOutput import AomrMeiOutput
-from rodan.jobs.gamera.auto_tasks.pitch_finding.AomrExceptions import AomrUnableToFindStavesError
-from rodan.jobs.base import RodanAutomaticTask
+from rodan.jobs.gamera.custom.pitch_finding.AomrObject import AomrObject
+from rodan.jobs.gamera.custom.pitch_finding.AomrMeiOutput import AomrMeiOutput
+from rodan.jobs.gamera.custom.pitch_finding.AomrExceptions import AomrUnableToFindStavesError
+from rodan.jobs.base import RodanTask
 
 
-class PitchFindingTask(RodanAutomaticTask):
-    name = 'gamera.auto_tasks.pitch_finding.pitch_finding'
+class PitchFindingTask(RodanTask):
+    name = 'gamera.custom.pitch_finding'
     author = "Deepanjan Roy"
     description = "Classifies the neumes detected in the page using the classifier interface."
     enabled = True
@@ -32,6 +32,7 @@ class PitchFindingTask(RodanAutomaticTask):
             }
         }
     }
+    interactive = False
 
     input_port_types = [{
         'name': 'Segmented Image',
@@ -51,8 +52,7 @@ class PitchFindingTask(RodanAutomaticTask):
         'maximum': 1
     }]
 
-    def run_my_task(self, inputs, rodan_job_settings, outputs):
-        settings = argconvert.convert_to_gamera_settings(rodan_job_settings)
+    def run_my_task(self, inputs, settings, outputs):
         gamera_xml_path = inputs['Classifier Result'][0]['resource_path']
         segmented_image_path = inputs['Segmented Image'][0]['resource_path']
 

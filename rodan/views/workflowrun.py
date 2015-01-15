@@ -31,11 +31,6 @@ class WorkflowRunList(generics.ListCreateAPIView):
 
     #### Parameters
     - `workflow` -- GET-only. UUID(GET) or Hyperlink(POST) of a Workflow.
-
-
-    [TODO]: Deprecated parameters??
-    - test=true: Sets whether this is a test run or not. (POST only)
-    - page_id=$ID: If this is a test run, you must supply a page ID to test the workflow on. (POST only)
     """
     model = WorkflowRun
     permission_classes = (permissions.IsAuthenticated, )
@@ -52,12 +47,13 @@ class WorkflowRunList(generics.ListCreateAPIView):
         if not wf.valid:
             raise ValidationError({'workflow': ["Workflow must be valid before you can run it."]})
 
-        wfrun = serializer.save(creator=self.request.user, project=wf.project)
+        wfrun = serializer.save(creator=self.request.user, project=wf.project, workflow_name=wf.name)
         wfrun_id = str(wfrun.uuid)
-        self._create_workflow_run(wf, wfrun)
+        test_run = serializer.validated_data.get('test_run', False)
+        self._create_workflow_run(wf, wfrun, test_run)
         registry.tasks['rodan.core.master_task'].apply_async((wfrun_id,))
 
-    def _create_workflow_run(self, workflow, workflow_run):
+    def _create_workflow_run(self, workflow, workflow_run, test_run):
         endpoint_workflowjobs = self._endpoint_workflow_jobs(workflow)
         singleton_workflowjobs = self._singleton_workflow_jobs(workflow)
         workflowjob_runjob_map = {}
@@ -71,6 +67,8 @@ class WorkflowRunList(generics.ListCreateAPIView):
             resources = rc_multiple.resources.all()
             for res in resources:
                 self._runjob_creation_loop(endpoint_workflowjobs, singleton_workflowjobs, workflowjob_runjob_map, workflow_run, res)
+                if test_run:
+                    break
         else:
             self._runjob_creation_loop(endpoint_workflowjobs, singleton_workflowjobs, workflowjob_runjob_map, workflow_run, None)
 
@@ -156,9 +154,10 @@ class WorkflowRunList(generics.ListCreateAPIView):
 
     def _create_runjob_A(self, wfjob, workflow_run, arg_resource):
         run_job = RunJob(workflow_job=wfjob,
+                         workflow_job_uuid=wfjob.uuid.hex,
+                         resource_uuid=arg_resource.uuid.hex if arg_resource else None,
                          workflow_run=workflow_run,
                          job_name=wfjob.job.job_name,
-                         interactive=wfjob.job.interactive,
                          job_settings=wfjob.job_settings)
         run_job.save()
 
@@ -178,7 +177,7 @@ class WorkflowRunList(generics.ListCreateAPIView):
             if arg_resource:   # resource collection identifier
                 resource.name = arg_resource.name
             else:
-                resource.name = 'output'  # assign a name for it
+                resource.name = 'Output of workflow {0}'.format(workflow_run.workflow_name)  # assign a name for it
             resource.origin = output
             resource.save()
 
@@ -237,20 +236,39 @@ class WorkflowRunDetail(generics.RetrieveAPIView):
         old_status = wfrun.status
         new_status = request.data.get('status', None)
 
-        if old_status == task_status.PROCESSING and new_status == task_status.CANCELLED:
-            runjobs_to_revoke_query = RunJob.objects.filter(workflow_run=wfrun, status__in=(task_status.SCHEDULED, task_status.PROCESSING))
+        if old_status in (task_status.PROCESSING, task_status.RETRYING) and new_status == task_status.CANCELLED:
+            runjobs_to_revoke_query = RunJob.objects.filter(workflow_run=wfrun, status__in=(task_status.SCHEDULED, task_status.PROCESSING, task_status.WAITING_FOR_INPUT))
             runjobs_to_revoke_celery_id = runjobs_to_revoke_query.values_list('celery_task_id', flat=True)
 
             for celery_id in runjobs_to_revoke_celery_id:
                 if celery_id is not None:
                     revoke(celery_id, terminate=True)
+            runjobs_to_revoke_query.update(status=task_status.CANCELLED)
 
-            runjobs_to_revoke_query.update(status=task_status.CANCELLED, ready_for_input=False)
             serializer = self.get_serializer(wfrun, data={'status': task_status.CANCELLED}, partial=True)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            return Response(serializer.data)
+        elif old_status in (task_status.CANCELLED, task_status.FAILED) and new_status == task_status.RETRYING:
+            runjobs_to_retry_query = RunJob.objects.filter(workflow_run=wfrun, status__in=(task_status.FAILED, task_status.CANCELLED))
+            for rj in runjobs_to_retry_query:
+                rj.status = task_status.SCHEDULED
+                rj.error_summary = ''
+                rj.error_details = ''
+                original_settings = {}
+                for k, v in rj.job_settings.iteritems():
+                    if not k.startswith('@'):
+                        original_settings[k] = v
+                rj.job_settings = original_settings
+                rj.save(update_fields=['status', 'job_settings', 'error_summary', 'error_details'])
+
+            registry.tasks['rodan.core.master_task'].apply_async((wfrun.uuid.hex,))
+
+            serializer = self.get_serializer(wfrun, data={'status': task_status.RETRYING}, partial=True)
             serializer.is_valid(raise_exception=True)
             serializer.save()
             return Response(serializer.data)
         elif new_status is not None:
             raise CustomAPIException({'status': ["Invalid status update"]}, status=status.HTTP_400_BAD_REQUEST)
         else:
-            raise CustomAPIException({'status': ["Invalid status update"]}, status=status.HTTP_400_BAD_REQUEST)
+            raise CustomAPIException({'status': ["Invalid update"]}, status=status.HTTP_400_BAD_REQUEST)

@@ -71,13 +71,18 @@
               <tr ng-repeat="w in workflows" ng-class="{success: w.valid, danger: !w.valid}">
                 <td ng-bind="w.uuid"></td>
                 <td ng-bind="w.name"></td>
-                <td><button ng-click="validateWorkflow(w)">Validate</button><button ng-click="deleteWorkflow(w)">Delete</button><button ng-click="runWorkflow(w)">Run</button></td>
+                <td><button ng-click="validateWorkflow(w)">Validate</button><button ng-click="deleteWorkflow(w)">Delete</button><button ng-click="runWorkflow(w)">Run</button><button ng-click="runWorkflow(w, true)">Test run</button></td>
+                <td>
+                  <a ng-href="{{w.url + '?export=true&format=json'}}" target="_blank">Export</a>
+                </td>
               </tr>
             </tbody>
           </table>
         </div>
         <div class="col-xs-4">
-          <div><label>Project: <select ng-model="project" ng-options="p.url as p.name for p in projects"></select></label></div>
+          <div>
+            <label>Project: <select ng-model="project" ng-options="p.url as p.name for p in projects"></select></label>
+          </div>
           <form ng-submit="newToGreyscaleWorkflow()">
             <fieldset>
               <legend>New to_greyscale Workflow</legend>
@@ -104,7 +109,7 @@
           </form>
           <form ng-submit="newDespeckleWorkflow()">
             <fieldset>
-              <legend>New despeckle Workflow</legend>
+              <legend>New despeckle (interactive) Workflow</legend>
               <div><label>Resources (select onebit): <select ng-model="resources_despeckle" ng-options="r.url as (r.name + '--' + r.uuid.slice(0, 6)) for r in resources" multiple></select></label></div>
               <input type="name" placeholder="Workflow Name" ng-model="name_despeckle"/>
               <button type="submit">Submit</button>
@@ -149,12 +154,21 @@
         <div ng-repeat="wfrun in workflowruns" class="col-xs-12">
           <div class="panel panel-default">
             <div class="panel-heading">
-              <h3 class="panel-title" ng-bind="wfrun.uuid"></h3>
-              For <code>{{ wfrun.workflow || "[DELETED]" }}</code>
+              <h3 class="panel-title">{{wfrun.workflow_name}} @ {{wfrun.created}} <sub>({{wfrun.uuid}})</sub></h3>
+              <b ng-show="wfrun.test_run">test run</b> for <code>{{ wfrun.workflow || "[DELETED]" }}</code>
               <b>Status: {{status[wfrun.status]}}</b>
+              <button ng-click="retryWorkflowRun(wfrun)">Retry</button>
               <button ng-click="cancelWorkflowRun(wfrun)">Cancel</button>
-              <button ng-click="packageResults(wfrun)">Package Results</button>
-              <button ng-click="packageResults(wfrun, 10000)">Package Results (expire in 10sec)</button>
+              <br />
+              <b>Package results --</b>
+              packaging mode:
+              <select ng-model="packaging_mode" ng-init="packaging_mode = 0">
+                <option ng-value="0">0</option>
+                <option ng-value="1">1</option>
+                <option ng-value="2">2</option>
+              </select>
+              <button ng-click="packageResults(wfrun, packaging_mode)">Package Results</button>
+              <button ng-click="packageResults(wfrun, packaging_mode, 10000)">Package Results (expire in 10sec)</button>
             </div>
             <div class="panel-body">
               <table class="table">
@@ -162,7 +176,7 @@
                   <td ng-bind="rj.job_name"></td>
                   <td>
                     <p ng-bind="status[rj.status]"></p>
-                    <a ng-show="rj.ready_for_input" ng-href="{{rj.interactive_url}}" target="_blank">Interactive</a>
+                    <a ng-show="rj.status == 2" ng-href="{{rj.interactive_url}}" target="_blank">Interactive</a>
                     <div ng-show="rj.status == -1">
                       <b>{{rj.error_summary}}</b>
                       <pre><code>{{rj.error_details}}</code></pre>
@@ -181,7 +195,7 @@
             <tbody>
               <tr ng-repeat="rp in resultspackages" ng-class="{success: rp.status == 4, danger: rp.status == -1, active: rp.status == 1, info: rp.status == 8}">
                 <td>
-                  <p>For WorkflowRun {{rp.workflow_run}}</p>
+                  <p>For WorkflowRun {{rp.workflow_run}} <code>mode={{rp.packaging_mode}}</code></p>
                   <div ng-show="rp.status == -1">
                     <code>{{rp.error_summary}}</code>
                     <pre><code>{{rp.error_details}}</code></pre>

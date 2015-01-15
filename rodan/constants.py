@@ -9,6 +9,8 @@ class task_status:
     FAILED = -1
     CANCELLED = 9
 
-    EXPIRED = 8
+    EXPIRED = 8    # only for ResultsPackage
+    WAITING_FOR_INPUT = 2    # only for RunJob
+    RETRYING = 11  # only for WorkflowRun
 
     NOT_APPLICABLE = None
