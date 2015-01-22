@@ -157,14 +157,14 @@ class package_results(Task):
                         filepath = output['resource__compat_resource_file']
                         ext = os.path.splitext(filepath)[1]
 
-                        res_name = res_namefinder.find(output['run_job__resource_uuid'], output['resource__name'])
+                        res_name = res_namefinder.find(output['run_job__resource_uuid'], output['resource__name'])  # [TODO]: or... find the modified resource name if the resource_uuid still exists?
                         result_filename = "{0}{1}".format(res_name, ext)
                         if not os.path.exists(op_dir):
                             os.makedirs(op_dir)
                         shutil.copyfile(filepath, os.path.join(op_dir, result_filename))
 
                 elif mode == 1:
-                    res_name = res_namefinder.find(output['run_job__resource_uuid'], output['resource__name'])
+                    res_name = res_namefinder.find(output['run_job__resource_uuid'], output['resource__name'])  # [TODO]: or... find the modified resource name if the resource_uuid still exists?
                     res_dir = os.path.join(tmp_dir, res_name)
 
                     j_name = job_namefinder.find(output['run_job__workflow_job_uuid'], output['run_job__job_name'])
@@ -236,6 +236,7 @@ class package_results(Task):
         def __init__(self, new_name_pattern="{0} ({1})"):
             self.original_name_count = {}
             self.id_name_map = {}
+            self.new_name_pattern = new_name_pattern
         def find(self, identifier, original_name):
             if identifier not in self.id_name_map:
                 if original_name not in self.original_name_count:
@@ -244,7 +245,7 @@ class package_results(Task):
                     return original_name
                 else:
                     self.original_name_count[original_name] += 1
-                    new_name = new_name_pattern.format(original_name, self.original_name_count[original_name])
+                    new_name = self.new_name_pattern.format(original_name, self.original_name_count[original_name])
                     self.id_name_map[identifier] = new_name
                     return new_name
             else:
